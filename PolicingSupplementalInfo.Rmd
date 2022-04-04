@@ -1,0 +1,187 @@
+---
+title: "Supplemental Information: Impact of precipitation and temperature on the racial composition and citation activity of traffic stops in the United States"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(stargazer)
+library(splines)
+library(scales)
+load("PolicingRegData.RData")
+dfcity1        = subset(dfcity,hispanic==0)
+dfstate1       = subset(dfstate,hispanic==0)
+dfcity1rain    = subset(dfcity1,tempk>278.15)
+dfstate1rain   = subset(dfstate1,tempk>278.15)
+glmblack       = dget("FunGLMBlack.R")
+glmcitation    = dget("FunGLMCitation.R")
+```
+The following document presents supplemental information. All data and code to recreate the analysis in the paper is available at [https://www.github.com/trafficstops/Paper](https://www.github.com/trafficstops/Paper). Here is the Quick Guide to replicate the results and Supplemental Information. 
+
+1. Download the 9 files in the aforementioned GitHub repository in a folder onto your local drive.
+2. Run `PolicingMain.R` to get the paper results. This will also write the `PolicingRegData.RData` into the folder. Make sure all the necessary R packages are available. 
+3. Run `PolicingSupplementalInfo.Rmd`.
+
+Here is the slightly longer version. The repository contains the following main files necessary to replicate the analysis and results in the main manuscript:
+
+- `PolicingMain.R`
+- `PolicingData.RData`
+
+For the file `PolicingMain.R` to run, the following functions are required as well:
+
+- `FunGLMBlack.R`
+- `FunGLMCitation.R`
+- `FunOrmsbeeDeterministic.R`
+- `FunOrmsbeeStochastic.R`
+- `FunProRain.R`
+
+Executing the file `PolicingMain.R` replicates the calculations to obtain Tables 1 and 2 as well as Figure 2. Note that on Line 102 and 106 of `PolicingMain.R`, the software writes and immediately reads the following file:  
+
+- `PolicingRegData.RData`
+
+The file `PolicingRegData.RData` is necessary to compile the Supplemental Information. The code prior to line 102 determines the precipitation distribution over various time intervals (i.e., 10-, 15-, 20-minute intervals). The code after line 106, executes the actual analysis from the paper. The source file and the pdf-file associated this document are included as well.
+
+\pagebreak
+## City summary statistics on race and warning/citation/arrest
+Note that for some cities, the data is missing regarding the issuance of citations whereas for others, the summary statistics indicate that for 100\% of stops a citation was issued. For the analysis with $citation$ as the dependent variable, all cities (and states) with a value of 100\% citations were removed. 
+
+```{r citysummary,echo=FALSE,results='asis'}
+share               = aggregate(dfcity[,c("black","hispanic","white","citation")],
+                                FUN=mean,by=list(dfcity$jcode))
+colnames(share)     = c("jcode","black","hispanic","white","citation")
+share               = merge(share,juridictions,by=c("jcode"))
+share               = share[,c("jurisdiction","state","black","hispanic","white","citation")]
+colnames(share)     = c("City","State","Black","Hispanic","White","Citation")
+share$Black         = percent(share$Black,2)
+share$Hispanic      = percent(share$Hispanic,2)
+share$White         = percent(share$White,2)
+share$Citation      = percent(share$Citation,2)
+opts                = options(knitr.kable.NA = "")
+knitr::kable(share,align=rep('r',5))
+```
+
+\pagebreak
+## State summary statistics on race and warning/citation/arrest
+```{r statesummary,echo=FALSE}
+share               = aggregate(dfstate[,c("black","hispanic","white","citation")],
+                                FUN=mean,by=list(dfstate$jcode))
+colnames(share)     = c("jcode","black","hispanic","white","citation")
+share               = merge(share,juridictions,by=c("jcode"))
+share               = share[,c("state","black","hispanic","white","citation")]
+colnames(share)     = c("State","Black","Hispanic","White","Citation")
+share$Black         = percent(share$Black,2)
+share$Hispanic      = percent(share$Hispanic,2)
+share$White         = percent(share$White,2)
+share$Citation      = percent(share$Citation,2)
+opts                = options(knitr.kable.NA = "")
+knitr::kable(share,align=rep('r',4))
+```
+
+\pagebreak
+## Robustness checks regarding weather disaggregation
+For data main results in the manuscript, we have used the "deterministic" approached presented in [Ormsbee (1989)](https://doi.org/10.1061/(asce)0733-9429(1989)115:4(507)). This section uses the "stochastic" approach including for the 20-minute interval. Our results are robust to a different method in distributing the precipitation data over the interval of one hour. 
+
+### City data and 20-min intervals
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("sto20",dfcity1)
+bhat2      = glmblack("tempk",dfcity1)
+bhat3      = glmblack("tempk+sto20+I(tempk*sto20)",dfcity1)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+### City data and 15-min intervals
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("sto15",dfcity1)
+bhat2      = glmblack("tempk",dfcity1)
+bhat3      = glmblack("tempk+sto15+I(tempk*sto15)",dfcity1)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+### City data and 10-min intervals
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("sto10",dfcity1)
+bhat2      = glmblack("tempk",dfcity1)
+bhat3      = glmblack("tempk+sto10+I(tempk*sto10)",dfcity1)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+### State data and 20-min intervals
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("sto20",dfstate1)
+bhat2      = glmblack("tempk",dfstate1)
+bhat3      = glmblack("tempk+sto20+I(tempk*sto20)",dfstate1)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+### State data and 15-min intervals
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("sto15",dfstate1)
+bhat2      = glmblack("tempk",dfstate1)
+bhat3      = glmblack("tempk+sto15+I(tempk*sto15)",dfstate1)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+### State data and 10-min intervals
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("sto10",dfstate1)
+bhat2      = glmblack("tempk",dfstate1)
+bhat3      = glmblack("tempk+sto10+I(tempk*sto10)",dfstate1)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+## Robustness checks regarding rain versus precipitation
+The results in the main paper are based on precipitation which includes all forms (e.g., rain, sleet, snow). In this section, we exclude all traffic stops that were conducted below 5 degrees Celsius to ensure that only rain is measured. Again, the results are robust and overlap with results presented in the main text. 
+
+### City data
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("det",dfcity1rain)
+bhat2      = glmblack("tempk",dfcity1rain)
+bhat3      = glmblack("tempk+det+I(tempk*det)",dfcity1rain)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
+
+\pagebreak
+### State data
+```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
+bhat1      = glmblack("det",dfstate1rain)
+bhat2      = glmblack("tempk",dfstate1rain)
+bhat3      = glmblack("tempk+det+I(tempk*det)",dfstate1rain)
+```
+
+```{r,echo=FALSE,results='asis'}
+stargazer(bhat1,bhat2,bhat3,
+          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+```
