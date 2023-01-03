@@ -9,4 +9,4 @@ function(input){
      tseq      = c(V*Vm1/Vsum,V*V/Vsum,V*Vp1/Vsum)
      output    = tseq[idpos]
      output[is.na(output)] = 0
-     return(output)} 
+     return(output)}

@@ -1,12 +1,14 @@
 ---
-title: "Supplemental Information: Impact of precipitation and temperature on the racial composition and citation activity of traffic stops in the United States"
+title: "Supplemental Information: Weather impact on racial composition and citation activity of traffic stops in the United States"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
+library(fastDummies)
 library(stargazer)
 library(splines)
 library(scales)
+library(ggplot2)
 load("PolicingRegData.RData")
 dfcity1        = subset(dfcity,hispanic==0)
 dfstate1       = subset(dfstate,hispanic==0)
@@ -14,6 +16,31 @@ dfcity1rain    = subset(dfcity1,tempk>278.15)
 dfstate1rain   = subset(dfstate1,tempk>278.15)
 glmblack       = dget("FunGLMBlack.R")
 glmcitation    = dget("FunGLMCitation.R")
+citylist       = c("AR1","AZ2","CA2","CA4","CA5","CA7","CA8","CA9","CO1","CT1","KS1",
+                   "KY1","KY2","LA1","MN1","NC1","NC2","NC3","NC4","NC5","NC7","ND1",
+                   "NJ1","NV1","NY1","OH1","OH2","OK1","OK2","PA1","TN1","TX1","TX3",
+                   "TX6","TX7","VT1","WI1")
+statelist      = c("CT2","FL2","GA1","MI1","ND2","NH1","NY2","OH3","TN2","TX8","WI2")
+nsdf6          = ns(dfcity1$clocktime,df=6)
+colnames(nsdf6)= c("ns1","ns2","ns3","ns4","ns5","ns6")
+dfcity1        = cbind(dfcity1,nsdf6)
+dfcity1        = dummy_cols(dfcity1,select_columns="jcode")
+names(dfcity1) = sub("jcode_","",names(dfcity1))
+nsdf6          = ns(dfstate1$clocktime,df=6)
+colnames(nsdf6)= c("ns1","ns2","ns3","ns4","ns5","ns6")
+dfstate1       = cbind(dfstate1,nsdf6)
+dfstate1       = dummy_cols(dfstate1,select_columns="jcode")
+names(dfstate1)= sub("jcode_","",names(dfstate1))
+nsdf6          = ns(dfcity1rain$clocktime,df=6)
+colnames(nsdf6)= c("ns1","ns2","ns3","ns4","ns5","ns6")
+dfcity1rain    = cbind(dfcity1rain,nsdf6)
+dfcity1rain    = dummy_cols(dfcity1rain,select_columns="jcode")
+names(dfcity1rain) = sub("jcode_","",names(dfcity1rain))
+nsdf6          = ns(dfstate1rain$clocktime,df=6)
+colnames(nsdf6)= c("ns1","ns2","ns3","ns4","ns5","ns6")
+dfstate1rain   = cbind(dfstate1rain,nsdf6)
+dfstate1rain   = dummy_cols(dfstate1rain,select_columns="jcode")
+names(dfstate1rain)= sub("jcode_","",names(dfstate1rain))
 ```
 The following document presents supplemental information. All data and code to recreate the analysis in the paper is available at [https://www.github.com/trafficstops/Paper](https://www.github.com/trafficstops/Paper). Here is the Quick Guide to replicate the results and Supplemental Information. 
 
@@ -41,7 +68,7 @@ Executing the file `PolicingMain.R` replicates the calculations to obtain Tables
 The file `PolicingRegData.RData` is necessary to compile the Supplemental Information. The code prior to line 102 determines the precipitation distribution over various time intervals (i.e., 10-, 15-, 20-minute intervals). The code after line 106, executes the actual analysis from the paper. The source file and the pdf-file associated this document are included as well.
 
 \pagebreak
-## City summary statistics on race and warning/citation/arrest
+## City summary statistics on race and citation
 Note that for some cities, the data is missing regarding the issuance of citations whereas for others, the summary statistics indicate that for 100\% of stops a citation was issued. For the analysis with $citation$ as the dependent variable, all cities (and states) with a value of 100\% citations were removed. 
 
 ```{r citysummary,echo=FALSE,results='asis'}
@@ -60,7 +87,7 @@ knitr::kable(share,align=rep('r',5))
 ```
 
 \pagebreak
-## State summary statistics on race and warning/citation/arrest
+## State summary statistics on race and citation
 ```{r statesummary,echo=FALSE}
 share               = aggregate(dfstate[,c("black","hispanic","white","citation")],
                                 FUN=mean,by=list(dfstate$jcode))
@@ -82,79 +109,91 @@ For data main results in the manuscript, we have used the "deterministic" approa
 
 ### City data and 20-min intervals
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("sto20",dfcity1)
-bhat2      = glmblack("tempk",dfcity1)
-bhat3      = glmblack("tempk+sto20+I(tempk*sto20)",dfcity1)
+bhat1      = glmblack("sto20",dfcity1,"City")
+bhat2      = glmblack("sto20+night:sto20",dfcity1,"City")
+bhat3      = glmblack("sto20+tempk",dfcity1,"City")
+bhat4      = glmblack("sto20+tempk+sto20:tempk",dfcity1,"City")
+bhat5      = glmblack("sto20+tempk+sto20:tempk+night:sto20",dfcity1,"City")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
 ### City data and 15-min intervals
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("sto15",dfcity1)
-bhat2      = glmblack("tempk",dfcity1)
-bhat3      = glmblack("tempk+sto15+I(tempk*sto15)",dfcity1)
+bhat1      = glmblack("sto15",dfcity1,"City")
+bhat2      = glmblack("sto15+night:sto15",dfcity1,"City")
+bhat3      = glmblack("sto15+tempk",dfcity1,"City")
+bhat4      = glmblack("sto15+tempk+sto15:tempk",dfcity1,"City")
+bhat5      = glmblack("sto15+tempk+sto15:tempk+night:sto15",dfcity1,"City")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
 ### City data and 10-min intervals
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("sto10",dfcity1)
-bhat2      = glmblack("tempk",dfcity1)
-bhat3      = glmblack("tempk+sto10+I(tempk*sto10)",dfcity1)
+bhat1      = glmblack("sto10",dfcity1,"City")
+bhat2      = glmblack("sto10+night:sto10",dfcity1,"City")
+bhat3      = glmblack("sto10+tempk",dfcity1,"City")
+bhat4      = glmblack("sto10+tempk+sto10:tempk",dfcity1,"City")
+bhat5      = glmblack("sto10+tempk+sto10:tempk+night:sto10",dfcity1,"City")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
 ### State data and 20-min intervals
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("sto20",dfstate1)
-bhat2      = glmblack("tempk",dfstate1)
-bhat3      = glmblack("tempk+sto20+I(tempk*sto20)",dfstate1)
+bhat1      = glmblack("sto20",dfstate1,"State")
+bhat2      = glmblack("sto20+night:sto20",dfstate1,"State")
+bhat3      = glmblack("sto20+tempk",dfstate1,"State")
+bhat4      = glmblack("sto20+tempk+sto20:tempk",dfstate1,"State")
+bhat5      = glmblack("sto20+tempk+sto20:tempk+night:sto20",dfstate1,"State")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
 ### State data and 15-min intervals
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("sto15",dfstate1)
-bhat2      = glmblack("tempk",dfstate1)
-bhat3      = glmblack("tempk+sto15+I(tempk*sto15)",dfstate1)
+bhat1      = glmblack("sto15",dfstate1,"State")
+bhat2      = glmblack("sto15+night:sto15",dfstate1,"State")
+bhat3      = glmblack("sto15+tempk",dfstate1,"State")
+bhat4      = glmblack("sto15+tempk+sto15:tempk",dfstate1,"State")
+bhat5      = glmblack("sto15+tempk+sto15:tempk+night:sto15",dfstate1,"State")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
 ### State data and 10-min intervals
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("sto10",dfstate1)
-bhat2      = glmblack("tempk",dfstate1)
-bhat3      = glmblack("tempk+sto10+I(tempk*sto10)",dfstate1)
+bhat1      = glmblack("sto10",dfstate1,"State")
+bhat2      = glmblack("sto10+night:sto10",dfstate1,"State")
+bhat3      = glmblack("sto10+tempk",dfstate1,"State")
+bhat4      = glmblack("sto10+tempk+sto10:tempk",dfstate1,"State")
+bhat5      = glmblack("sto10+tempk+sto10:tempk+night:sto10",dfstate1,"State")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
@@ -163,25 +202,1187 @@ The results in the main paper are based on precipitation which includes all form
 
 ### City data
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("det",dfcity1rain)
-bhat2      = glmblack("tempk",dfcity1rain)
-bhat3      = glmblack("tempk+det+I(tempk*det)",dfcity1rain)
+bhat1     = glmblack("det",dfcity1rain,"City")
+bhat2     = glmblack("det+night:det",dfcity1rain,"City")
+bhat3     = glmblack("det+tempk",dfcity1rain,"City")
+bhat4     = glmblack("det+tempk+det:tempk",dfcity1rain,"City")
+bhat5     = glmblack("det+tempk+det:tempk+night:det",dfcity1rain,"City")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
 ```
 
 \pagebreak
 ### State data
 ```{r,echo=FALSE,message=FALSE,warning=FALSE,output=FALSE,include=FALSE}
-bhat1      = glmblack("det",dfstate1rain)
-bhat2      = glmblack("tempk",dfstate1rain)
-bhat3      = glmblack("tempk+det+I(tempk*det)",dfstate1rain)
+bhat1     = glmblack("det",dfstate1rain,"State")
+bhat2     = glmblack("det+night:det",dfstate1rain,"State")
+bhat3     = glmblack("det+tempk",dfstate1rain,"State")
+bhat4     = glmblack("det+tempk+det:tempk",dfstate1rain,"State")
+bhat5     = glmblack("det+tempk+det:tempk+night:det",dfstate1rain,"State")
 ```
 
 ```{r,echo=FALSE,results='asis'}
-stargazer(bhat1,bhat2,bhat3,
-          type="latex",omit=c("jcode","clocktime","dststart"),no.space=TRUE,header=FALSE)
+stargazer(bhat1,bhat2,bhat3,bhat4,bhat5,type="latex",no.space=TRUE,header=FALSE,
+          omit=c(citylist,statelist,"ns1","ns2","ns3","ns4","ns5","ns6","clocktime","dststart"))
+```
+
+\clearpage
+## Traffic Stop Rate and Proportion Black
+```{r,echo=FALSE}
+load("PolicingRegData.RData")
+#--------------------------------------------------------------------------------------------------
+stoprate_state      = data.frame(night=numeric(),clocktime=numeric(),rain=character(),
+                                 rate=numeric(),jcode=character())
+for(i in unique(dfstate$jcode)){
+     df             = subset(dfstate,jcode==i)
+     rain           = subset(df,det>0)
+     rain           = quantile(rain$det)
+     df$rain        = cut(df$det,breaks=c(-Inf,0,rain[2:5]),
+                          labels=c("No rain","Q1","Q2","Q3","Q4"))
+     df$clocktime   = floor(df$clocktime)
+     df$count       = 1
+     df$date        = as.Date(df$datetime)
+     df             = aggregate(df$count,FUN=sum,by=list(df$night,df$clocktime,df$rain,df$date))
+     colnames(df)   = c("night","clocktime","rain","date","value")
+     df             = aggregate(df$value,FUN=mean,by=list(df$night,df$clocktime,df$rain))
+     colnames(df)   = c("night","clocktime","rain","rate")
+     df$jcode       = i
+     stoprate_state = rbind(stoprate_state,df)}
+stoprate_state$night= ifelse(stoprate_state$night==1,"Night","Day")
+#--------------------------------------------------------------------------------------------------
+stoprate_city       = data.frame(night=numeric(),clocktime=numeric(),rain=character(),
+                                 rate=numeric(),jcode=character())
+for(i in unique(dfcity$jcode)){
+     df             = subset(dfcity,jcode==i)
+     rain           = subset(df,det>0)
+     rain           = quantile(rain$det)
+     df$rain        = cut(df$det,breaks=c(-Inf,0,rain[2:5]),
+                          labels=c("No rain","Q1","Q2","Q3","Q4"))
+     df$clocktime   = floor(df$clocktime)
+     df$count       = 1
+     df$date        = as.Date(df$datetime)
+     df             = aggregate(df$count,FUN=sum,by=list(df$night,df$clocktime,df$rain,df$date))
+     colnames(df)   = c("night","clocktime","rain","date","value")
+     df             = aggregate(df$value,FUN=mean,by=list(df$night,df$clocktime,df$rain))
+     colnames(df)   = c("night","clocktime","rain","rate")
+     df$jcode       = i
+     stoprate_city  = rbind(stoprate_city,df)}
+stoprate_city$night = ifelse(stoprate_city$night==1,"Night","Day")
+#--------------------------------------------------------------------------------------------------
+blackrate_state     = data.frame(night=numeric(),rain=character(),rate=numeric(),jcode=character(),
+                                 temperature=character())
+for(i in unique(dfstate$jcode)){
+     df             = subset(dfstate,jcode==i)
+     rain           = subset(df,det>0)
+     rain           = quantile(rain$det)
+     df$rain        = cut(df$det,breaks=c(-Inf,0,rain[2:5]),
+                          labels=c("No rain","Q1","Q2","Q3","Q4"))
+     temperature    = quantile(df$tempk)
+     df$temperature = cut(df$tempk,breaks=c(0,temperature[2:5]),
+                          labels=c("Q1","Q2","Q3","Q4"))
+     df$date        = as.Date(df$datetime)
+     df             = aggregate(df$black,FUN=mean,by=list(df$night,df$rain,df$temperature))
+     colnames(df)   = c("night","rain","temperature","rate")
+     df$jcode       = i
+     blackrate_state= rbind(blackrate_state,df)}
+blackrate_state$night= ifelse(blackrate_state$night==1,"Night","Day")
+#--------------------------------------------------------------------------------------------------
+blackrate_city      = data.frame(night=numeric(),rain=character(),rate=numeric(),jcode=character(),
+                                 temperature=character())
+for(i in unique(dfcity$jcode)){
+     df             = subset(dfcity,jcode==i)
+     rain           = subset(df,det>0)
+     rain           = quantile(rain$det)
+     df$rain        = cut(df$det,breaks=c(-Inf,0,rain[2:5]),
+                          labels=c("No rain","Q1","Q2","Q3","Q4"))
+     temperature    = quantile(df$tempk)
+     df$temperature = cut(df$tempk,breaks=c(0,temperature[2:5]),
+                          labels=c("Q1","Q2","Q3","Q4"))
+     df$date        = as.Date(df$datetime)
+     df             = aggregate(df$black,FUN=mean,by=list(df$night,df$rain,df$temperature))
+     colnames(df)   = c("night","rain","temperature","rate")
+     df$jcode       = i
+     blackrate_city= rbind(blackrate_city,df)}
+blackrate_city$night= ifelse(blackrate_city$night==1,"Night","Day")
+```
+
+\clearpage
+### Connecticut
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="CT2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="CT2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Florida
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="FL2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="FL2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Georgia
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="GA1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="GA1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Michigan
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="MI1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="MI1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### North Dakota
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="ND2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="ND2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### New Hampshire
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="NH1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="NH1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### New York
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="NY2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="NY2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Ohio
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="OH3")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="OH3")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Tennessee
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="TN2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="TN2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Texas
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="TX8")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="TX8")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Wisconsin
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_state,jcode=="WI2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_state,jcode=="WI2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Little Rock
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="AR1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="AR1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Albany
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NY1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NY1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Arlington
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="TX1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="TX1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Aurora
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CO1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CO1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Bakersfield
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CA2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CA2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Burlington
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="VT1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="VT1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Camden
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NJ1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NJ1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Charlotte
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NC1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NC1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Cincinnati
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="OH1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="OH1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Columbus
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="OH2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="OH2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Durham
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NC2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NC2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Fayetteville
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NC3")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NC3")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Garland
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="TX3")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="TX3")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Grand Forks
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="ND1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="ND1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Greensboro
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NC4")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NC4")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Hartford
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CT1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CT1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Henderson
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NV1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NV1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Little Rock
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="AR1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="AR1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Los Angeles
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CA4")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CA4")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Louisville
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="KY1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="KY1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Madison
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="WI1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="WI1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Mesa
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="AZ2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="AZ2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Nashville
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="TN1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="TN1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### New Orleans
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="LA1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="LA1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Oakland
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CA5")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CA5")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Oklahoma City
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="OK1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="OK1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Ownesboro
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="KY2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="KY2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Philadelphia
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="PA1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="PA1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Plano
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="TX6")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="TX6")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Raleigh
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NC5")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NC5")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Saint Paul
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="MN1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="MN1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### San Antonio
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="TX7")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="TX7")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### San Diego
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CA7")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CA7")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### San Francisco
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CA8")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CA8")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### San Jose
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="CA9")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="CA9")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Tulsa
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="OK2")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="OK2")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Wichita
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="KS1")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="KS1")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
+```
+
+\clearpage
+### Winston Salem
+```{r,echo=FALSE,fig.height=4}
+df = subset(stoprate_city,jcode=="NC7")
+ggplot(df,aes(x=factor(rain),y=rate,fill=factor(clocktime)))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("Traffic Stops per Hour")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Start Clock Time Hour"))
+```
+
+```{r,echo=FALSE,fig.height=4}
+df = subset(blackrate_city,jcode=="NC7")
+ggplot(df,aes(x=factor(rain),y=rate*100,fill=temperature))+
+     geom_bar(stat="identity", position=position_dodge(),color="black")+
+     facet_wrap(vars(night),ncol=2)+theme_bw()+ylab("% of Black Drivers")+
+     theme(axis.title.x=element_blank(),
+           legend.position="bottom")+
+      guides(fill=guide_legend("Ambient Temperature Quartile"))
 ```

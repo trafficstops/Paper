@@ -1,23 +1,28 @@
 #==================================================================================================
 # Title:                 Policing Main
-# Date:                  3 April 2022
+# Date:                  3 January 2023
 # Weather Scenario:      - Deterministic 20 Minutes
 #                        - Stochastic 20 Minutes (T=3)
 #                        - Stochastic 15 Minutes (T=4)
 #                        - Stochastic 10 Minutes (T=6)
+# BLACK Model:           - Base case for cities: AR1
+#                        - Base case for states: CT2
+# CITATIONS Model:       - Base case for cities: CA5
+#                        - Base case for states: CT2
 #==================================================================================================
 rm(list=ls())
-library(splines)
+library(fastDummies)
 library(ggplot2)
-library(mlogit)
-library(stargazer)
 library(margins)
+library(splines)
+library(stargazer)
 memory.limit(size=30000)
-setwd("G:/My Drive/Research/Live Manuscripts/Policing/Analysis")
+root                     = "G:/My Drive/Research/Live Manuscripts/Policing"
+setwd(paste(root,"/Analysis",sep=""))
+#--------------------------------------------------------------------------------------------------
+# Data Load and Functions
+#--------------------------------------------------------------------------------------------------
 load("PolicingData.RData")
-#--------------------------------------------------------------------------------------------------
-# Functions
-#--------------------------------------------------------------------------------------------------
 funprorain               = dget("FunProRain.R")
 funormsbeesto            = dget("FunOrmsbeeStochastic.R")
 funormsbeedet            = dget("FunOrmsbeeDeterministic.R")
@@ -106,90 +111,303 @@ save.image("PolicingRegData.RData")
 load("PolicingRegData.RData")
 glmblack                 = dget("FunGLMBlack.R")
 glmcitation              = dget("FunGLMCitation.R")
+citylist                 = c("AR1","AZ2","CA2","CA4","CA5","CA7","CA8","CA9","CO1","CT1","KS1",
+                             "KY1","KY2","LA1","MN1","NC1","NC2","NC3","NC4","NC5","NC7","ND1",
+                             "NJ1","NV1","NY1","OH1","OH2","OK1","OK2","PA1","TN1","TX1","TX3",
+                             "TX6","TX7","VT1","WI1")
+statelist                = c("CT2","FL2","GA1","MI1","ND2","NH1","NY2","OH3","TN2","TX8","WI2")
+nslist                   = c("ns1","ns2","ns3","ns4","ns5","ns6")
+#==================================================================================================
+# BLACK: City and State Logit Model
+#==================================================================================================
 dfcity1                  = subset(dfcity,hispanic==0)
 dfstate1                 = subset(dfstate,hispanic==0)
-#==================================================================================================
-# BLACK: City and State Regression Analysis
-#==================================================================================================
-black_c_p                = glmblack("det",dfcity1)
-black_c_t                = glmblack("tempk",dfcity1)
-black_c_pt               = glmblack("tempk+det+I(tempk*det)",dfcity1)
+nsdf6                    = ns(dfcity1$clocktime,df=6)
+colnames(nsdf6)          = nslist
+dfcity1                  = cbind(dfcity1,nsdf6)
+dfcity1                  = dummy_cols(dfcity1,select_columns="jcode")
+names(dfcity1)           = sub("jcode_","",names(dfcity1))
 #--------------------------------------------------------------------------------------------------
-black_s_p                = glmblack("det",dfstate1)
-black_s_t                = glmblack("tempk",dfstate1)
-black_s_pt               = glmblack("tempk+det+I(tempk*det)",dfstate1)
+black_c_p                = glmblack("det",dfcity1,"City")
+black_c_p_np             = glmblack("det+night:det",dfcity1,"City")
+black_c_p_t              = glmblack("det+tempk",dfcity1,"City")
+black_c_p_t_pt           = glmblack("det+tempk+det:tempk",dfcity1,"City")
+black_c_p_t_pt_np        = glmblack("det+tempk+det:tempk+night:det",dfcity1,"City")
 #--------------------------------------------------------------------------------------------------
-stargazer(black_c_p,black_c_t,black_c_pt,black_s_p,black_s_t,black_s_pt,
-          type="text",omit=c("jcode","clocktime","dststart"),no.space=TRUE)
+nsdf6                    = ns(dfstate1$clocktime,df=6)
+colnames(nsdf6)          = nslist
+dfstate1                 = cbind(dfstate1,nsdf6)
+dfstate1                 = dummy_cols(dfstate1,select_columns="jcode")
+names(dfstate1)          = sub("jcode_","",names(dfstate1))
 #--------------------------------------------------------------------------------------------------
-rm(dfcity1,dfstate1)
+black_s_p                = glmblack("det",dfstate1,"State")
+black_s_p_np             = glmblack("det+night:det",dfstate1,"State")
+black_s_p_t              = glmblack("det+tempk",dfstate1,"State")
+black_s_p_t_pt           = glmblack("det+tempk+det:tempk",dfstate1,"State")
+black_s_p_t_pt_np        = glmblack("det+tempk+det:tempk+night:det",dfstate1,"State")
+#--------------------------------------------------------------------------------------------------
+stargazer(black_c_p,black_c_p_np,black_c_p_t,black_c_p_t_pt,black_c_p_t_pt_np,
+          type="text",no.space=TRUE,omit=c(citylist,statelist,nslist,"clocktime","dststart"))
+stargazer(black_s_p,black_s_p_np,black_s_p_t,black_s_p_t_pt,black_s_p_t_pt_np,
+          type="text",no.space=TRUE,omit=c(citylist,statelist,nslist,"clocktime","dststart"))
+rm(dfcity1,dfstate1,nsdf6)
 #==================================================================================================
-# CITATION: City and State Regression Analysis
+# CITATION: City and State Logit Model
 #==================================================================================================
 dfcity$nonwhite          = dfcity$black+dfcity$hispanic
 dfstate$nonwhite         = dfstate$black+dfstate$hispanic
+citylist                 = c("CA5","CA8","CT1","KY1","LA1","MN1","NC1","NC2","NC3","NC4","NC5",
+                             "NC7","ND1","OH2","WI1")
+statelist                = c("CT2","MI1","NH1","TX8","WI2")
+dfcity                   = subset(dfcity,jcode %in% citylist)
+dfstate                  = subset(dfstate,jcode %in% statelist)
 #--------------------------------------------------------------------------------------------------
-dfcity                   = subset(dfcity,!(jcode %in% c("AR1","AZ2","CA2","CO1","KS1","KY2","NV1",
-                                                        "OK1","TX3","TX7")))
-dfstate                  = subset(dfstate,!(jcode %in% c("TN2")))
+nsdf6                    = ns(dfcity$clocktime,df=6)
+colnames(nsdf6)          = nslist
+dfcity                   = cbind(dfcity,nsdf6)
+dfcity                   = dummy_cols(dfcity,select_columns="jcode")
+names(dfcity)            = sub("jcode_","",names(dfcity))
 #--------------------------------------------------------------------------------------------------
-citation_c_p             = glmcitation("det",dfcity)
-citation_c_t             = glmcitation("tempk",dfcity)
-citation_c_pt            = glmcitation("tempk+det+I(tempk*det)",dfcity)
+citation_c_p             = glmcitation("det",dfcity,"City")
+citation_c_p_np          = glmcitation("det+night:det",dfcity,"City")
+citation_c_p_t           = glmcitation("det+tempk",dfcity,"City")
+citation_c_p_t_pt        = glmcitation("det+tempk+tempk:det",dfcity,"City")
+citation_c_p_t_pt_np     = glmcitation("det+tempk+tempk:det+night:det",dfcity,"City")
 #--------------------------------------------------------------------------------------------------
-citation_s_p             = glmcitation("det",dfstate)
-citation_s_t             = glmcitation("tempk",dfstate)
-citation_s_pt            = glmcitation("tempk+det+I(tempk*det)",dfstate)
+nsdf6                    = ns(dfstate$clocktime,df=6)
+colnames(nsdf6)          = nslist
+dfstate                  = cbind(dfstate,nsdf6)
+dfstate                  = dummy_cols(dfstate,select_columns="jcode")
+names(dfstate)           = sub("jcode_","",names(dfstate))
 #--------------------------------------------------------------------------------------------------
-stargazer(citation_c_p,citation_c_t,citation_c_pt,citation_s_p,citation_s_t,citation_s_pt,
-          type="text",omit=c("jcode","clocktime","dststart"),no.space=TRUE)
+citation_s_p             = glmcitation("det",dfstate,"State")
+citation_s_p_np          = glmcitation("det+night:det",dfstate,"State")
+citation_s_p_t           = glmcitation("det+tempk",dfstate,"State")
+citation_s_p_t_pt        = glmcitation("det+tempk+tempk:det",dfstate,"State")
+citation_s_p_t_pt_np     = glmcitation("det+tempk+tempk:det+night:det",dfstate,"State")
 #--------------------------------------------------------------------------------------------------
-rm(dfcity,dfstate,glmcitation)
+stargazer(citation_c_p,citation_c_p_np,citation_c_p_t,citation_c_p_t_pt,citation_c_p_t_pt_np,
+          no.space=TRUE,type="text",omit=c(citylist,statelist,nslist,"clocktime","dststart"))
+stargazer(citation_s_p,citation_s_p_np,citation_s_p_t,citation_s_p_t_pt,citation_s_p_t_pt_np,
+          no.space=TRUE,type="text",omit=c(citylist,statelist,nslist,"clocktime","dststart"))
+#--------------------------------------------------------------------------------------------------
+rm(dfcity,dfstate,glmcitation,glmblack,statelist,citylist,nsdf6,nslist)
 #==================================================================================================
-# Predicted Probabilities (Sheet "Predicted Probabilities" in Policing.xlsx)
+# Predicted Probabilities and Marginal Effects: Black
 #==================================================================================================
-temperature              = data.frame(temperature=c(0,10,20,30))
-precipitation            = data.frame(det=c(2.5/3,7.6/3,12.6/3),
-                                      detname=c("Light rain","Moderate rain","Heavy rain"))
+rainfall                 = seq(from=0,to=3,by=0.5)
+temperature              = seq(from=-10,to=30,by=10)+273.15
+newdfcity                = black_c_p_t_pt_np$model
+newdfcity                = newdfcity[0,]
+dftemplate               = newdfcity
+dftemplate[1,]           = colMeans(black_c_p_t_pt_np$model)
 #--------------------------------------------------------------------------------------------------
-newdf                    = data.frame(night=0,jcode="AR1",clocktime=18,dststart=0,year=2018,
-                                      jurisdiction="City")
-newdf                    = merge(newdf,temperature)
-newdf$tempk              = newdf$temperature+273.15
-newdf                    = merge(newdf,precipitation)
-cityrain                 = newdf
-cityrain$model           = "Rain"
-cityrain$predprob        = predict(black_c_p,newdata=newdf,type="response")
-citytemprain             = newdf
-citytemprain$model       = "Interaction Rain Temperature"
-citytemprain$predprob    = predict(black_c_pt,newdata=newdf,type="response")
+for(daylight in c(0,1)){
+     for(kelvin in temperature){
+          for(rain in rainfall){
+               df        = dftemplate
+               df$night  = daylight
+               df$tempk  = kelvin
+               df$det    = rain
+               newdfcity = rbind(newdfcity,df)}}}
 #--------------------------------------------------------------------------------------------------
-newdf                    = data.frame(night=0,jcode="CT2",clocktime=18,dststart=0,year=2018,
-                                      jurisdiction="State")
-newdf                    = merge(newdf,temperature)
-newdf$tempk              = newdf$temperature+273.15
-newdf                    = merge(newdf,precipitation)
-staterain                = newdf
-staterain$model          = "Rain"
-staterain$predprob       = predict(black_s_p,newdata=newdf,type="response")
-statetemprain            = newdf
-statetemprain$model      = "Interaction Rain Temperature"
-statetemprain$predprob   = predict(black_s_pt,newdata=newdf,type="response")
+newdfstate               = black_s_p_t_pt_np$model
+newdfstate               = newdfstate[0,]
+dftemplate               = newdfstate
+dftemplate[1,]           = colMeans(black_s_p_t_pt_np$model)
 #--------------------------------------------------------------------------------------------------
-newdf                    = rbind(cityrain,citytemprain,staterain,statetemprain)
-newdf                    = newdf[c("jurisdiction","temperature","det","detname","model",
-                                   "predprob")]
+for(daylight in c(0,1)){
+     for(kelvin in temperature){
+          for(rain in rainfall){
+               df        = dftemplate
+               df$night  = daylight
+               df$tempk  = kelvin
+               df$det    = rain
+               newdfstate= rbind(newdfstate,df)}}}
 #--------------------------------------------------------------------------------------------------
-newdfinteraction         = subset(newdf,model=="Interaction Rain Temperature")
-levelorder               = c("Light rain","Moderate rain","Heavy rain")
-ggplot(data=newdfinteraction,aes(x=factor(detname,levels=levelorder),
-                                 y=predprob,fill=as.character(temperature)))+
-     geom_bar(stat="identity",position=position_dodge())+theme_bw()+
-     facet_wrap(vars(jurisdiction))+scale_fill_brewer(palette="Reds")+
-     ylab("Predicted Probability")+
-     theme(axis.title.x=element_blank(),
-           legend.position="bottom",legend.title=element_blank())
-ggsave("predictedprobabilities.pdf",width=6,height=3)
+rm(daylight,kelvin,rain,rainfall,temperature,df,dftemplate)
+#--------------------------------------------------------------------------------------------------
+ppr_black_c              = margins(model=black_c_p_t_pt_np,data=newdfcity,type="response")
+ppr_black_c              = ppr_black_c[c("night","tempk","det","fitted","se.fitted")]
+ppr_black_c$item         = "City"
+ppr_black_c$model        = "C5"
+temp                     = margins(model=black_c_p,data=newdfcity,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "City"
+temp$model               = "C1"
+ppr_black_c              = rbind(ppr_black_c,temp)
+temp                     = margins(model=black_c_p_np,data=newdfcity,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "City"
+temp$model               = "C2"
+ppr_black_c              = rbind(ppr_black_c,temp)
+temp                     = margins(model=black_c_p_t,data=newdfcity,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "City"
+temp$model               = "C3"
+ppr_black_c              = rbind(ppr_black_c,temp)
+temp                     = margins(model=black_c_p_t_pt,data=newdfcity,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "City"
+temp$model               = "C4"
+ppr_black_c              = rbind(ppr_black_c,temp)
+ppr_black_s              = margins(model=black_s_p_t_pt_np,data=newdfstate,type="response")
+ppr_black_s              = ppr_black_s[c("night","tempk","det","fitted","se.fitted")]
+ppr_black_s$item         = "State"
+ppr_black_s$model        = "S5"
+temp                     = margins(model=black_s_p,data=newdfstate,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "State"
+temp$model               = "S1"
+ppr_black_s              = rbind(ppr_black_s,temp)
+temp                     = margins(model=black_s_p_np,data=newdfstate,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "State"
+temp$model               = "S2"
+ppr_black_s              = rbind(ppr_black_s,temp)
+temp                     = margins(model=black_s_p_t,data=newdfstate,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "State"
+temp$model               = "S3"
+ppr_black_s              = rbind(ppr_black_s,temp)
+temp                     = margins(model=black_s_p_t_pt,data=newdfstate,type="response")
+temp                     = temp[c("night","tempk","det","fitted","se.fitted")]
+temp$item                = "State"
+temp$model               = "S4"
+ppr_black_s              = rbind(ppr_black_s,temp)
+ppr_black                = rbind(ppr_black_c,ppr_black_s)
+ppr_black$night          = ifelse(ppr_black$night==1,"Night","Day")
+labels                   = c("-10C","0C","10C","20C","30C")
+breaks                   = seq(from=-15,to=35,by=10)+273.15
+#--------------------------------------------------------------------------------------------------
+ggplot(subset(ppr_black,model %in% c("C5","S5")),
+              aes(x=det,color=cut(tempk,breaks=breaks,include.lowest=TRUE)))+
+     geom_point(aes(y=fitted),position=position_dodge(width=0.25))+
+     geom_errorbar(aes(ymin=fitted-1.96*se.fitted,ymax=fitted+1.96*se.fitted),width=.01,
+                   position=position_dodge(width=0.25))+
+     facet_grid(vars(night),vars(item))+theme_bw()+xlab("Precipitation in mL per 20 Minutes")+
+     ylab("Predicted Probability (Black=1)")+ylim(0,1)+
+     theme(legend.title=element_blank(),legend.position="bottom")+
+     scale_color_brewer(type="qual",labels=labels,palette="Spectral",direction=-1)
+ggsave(paste(root,"/Manuscript/pprblack.pdf",sep=""),width=7,height=5)
+#--------------------------------------------------------------------------------------------------
+rm(black_c_p,black_c_p_np,black_c_p_t,black_c_p_t_pt,black_c_p_t_pt_np,
+   black_s_p,black_s_p_np,black_s_p_t,black_s_p_t_pt,black_s_p_t_pt_np,
+   ppr_black_c,ppr_black_s)
+#--------------------------------------------------------------------------------------------------
+ppr_black                = ppr_black[c("night","tempk","det","fitted","item","model")]
+ppr_black$temperature    = ppr_black$tempk-273.15
+#==================================================================================================
+# Predicted Probabilities: Citation
+#==================================================================================================
+rainfall                 = seq(from=0,to=3,by=0.5)
+temperature              = seq(from=-10,to=30,by=10)+273.15
+newdfcity                = citation_c_p_t_pt_np$model
+newdfcity                = newdfcity[0,]
+dftemplate               = newdfcity
+dftemplate[1,]           = colMeans(citation_c_p_t_pt_np$model)
+#--------------------------------------------------------------------------------------------------
+for(race in c(0,1)){
+     for(daylight in c(0,1)){
+          for(kelvin in temperature){
+               for(rain in rainfall){
+                    df             = dftemplate
+                    df$night       = daylight
+                    df$tempk       = kelvin
+                    df$det         = rain
+                    df$nonwhite    = race
+                    newdfcity      = rbind(newdfcity,df)}}}}
+#--------------------------------------------------------------------------------------------------
+newdfstate               = citation_s_p_t_pt_np$model
+newdfstate               = newdfstate[0,]
+dftemplate               = newdfstate
+dftemplate[1,]           = colMeans(citation_s_p_t_pt_np$model)
+#--------------------------------------------------------------------------------------------------
+for(race in c(0,1)){
+     for(daylight in c(0,1)){
+          for(kelvin in temperature){
+               for(rain in rainfall){
+                    df             = dftemplate
+                    df$night       = daylight
+                    df$tempk       = kelvin
+                    df$det         = rain
+                    df$nonwhite    = race
+                    newdfstate     = rbind(newdfstate,df)}}}}
+#--------------------------------------------------------------------------------------------------
+rm(daylight,kelvin,rain,rainfall,temperature,df,dftemplate)
+#--------------------------------------------------------------------------------------------------
+ppr_citation_c           = margins(model=citation_c_p_t_pt_np,data=newdfcity,type="response",
+                                   variables=c("nonwhite","det","night","tempk"))
+ppr_citation_c           = ppr_citation_c[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+ppr_citation_c$model     = "C5"
+temp                     = margins(model=citation_c_p,data=newdfcity,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "C1"
+ppr_citation_c           = rbind(ppr_citation_c,temp)
+temp                     = margins(model=citation_c_p_np,data=newdfcity,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "C2"
+ppr_citation_c           = rbind(ppr_citation_c,temp)
+temp                     = margins(model=citation_c_p_t,data=newdfcity,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "C3"
+ppr_citation_c           = rbind(ppr_citation_c,temp)
+temp                     = margins(model=citation_c_p_t_pt,data=newdfcity,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "C4"
+ppr_citation_c           = rbind(ppr_citation_c,temp)
+ppr_citation_c$night     = ifelse(ppr_citation_c$night==1,"Night","Day")
+ppr_citation_c$nonwhite  = ifelse(ppr_citation_c$nonwhite==1,"Nonwhite","White")
+ppr_citation_c$tempc     = ppr_citation_c$tempk-273.15
+#--------------------------------------------------------------------------------------------------
+ppr_citation_s           = margins(model=citation_s_p_t_pt_np,data=newdfstate,type="response")
+ppr_citation_s           = ppr_citation_s[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+ppr_citation_s$model     = "S5"
+temp                     = margins(model=citation_s_p,data=newdfstate,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "S1"
+ppr_citation_s           = rbind(ppr_citation_s,temp)
+temp                     = margins(model=citation_s_p_np,data=newdfstate,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "S2"
+ppr_citation_s           = rbind(ppr_citation_s,temp)
+temp                     = margins(model=citation_s_p_t,data=newdfstate,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "S3"
+ppr_citation_s           = rbind(ppr_citation_s,temp)
+temp                     = margins(model=citation_s_p_t_pt,data=newdfstate,type="response")
+temp                     = temp[c("nonwhite","night","tempk","det","fitted","se.fitted")]
+temp$model               = "S4"
+ppr_citation_s           = rbind(ppr_citation_s,temp)
+ppr_citation_s$night     = ifelse(ppr_citation_s$night==1,"Night","Day")
+ppr_citation_s$nonwhite  = ifelse(ppr_citation_s$nonwhite==1,"Nonwhite","White")
+ppr_citation_s$tempc     = ppr_citation_s$tempk-273.15
+#--------------------------------------------------------------------------------------------------
+labels                   = c("-10C","0C","10C","20C","30C")
+breaks                   = seq(from=-15,to=35,by=10)+273.15
+ggplot(subset(ppr_citation_c,model==c("C5")),
+       aes(x=det,color=cut(tempk,breaks=breaks,include.lowest=TRUE)))+
+     geom_point(aes(y=fitted),position=position_dodge(width=0.25))+
+     geom_errorbar(aes(ymin=fitted-1.96*se.fitted,ymax=fitted+1.96*se.fitted),width=.01,
+                   position=position_dodge(width=0.25))+
+     facet_grid(vars(night),vars(nonwhite))+theme_bw()+xlab("Precipitation in mL per 20 Minutes")+
+     ylab("Predicted Probability (Citation=1)")+ggtitle("City")+ylim(0,1)+
+     theme(legend.title=element_blank(),legend.position="bottom")+
+     scale_color_brewer(type="qual",labels=labels,palette="Spectral",direction=-1)
+ggsave(paste(root,"/Manuscript/pprcitationc.pdf",sep=""),width=7,height=5)
+#--------------------------------------------------------------------------------------------------
+labels                   = c("-10C","0C","10C","20C","30C")
+breaks                   = seq(from=-15,to=35,by=10)+273.15
+ggplot(subset(ppr_citation_s,model==c("S5")),
+       aes(x=det,color=cut(tempk,breaks=breaks,include.lowest=TRUE)))+
+     geom_point(aes(y=fitted),position=position_dodge(width=0.25))+
+     geom_errorbar(aes(ymin=fitted-1.96*se.fitted,ymax=fitted+1.96*se.fitted),width=.01,
+                   position=position_dodge(width=0.25))+
+     facet_grid(vars(night),vars(nonwhite))+theme_bw()+xlab("Precipitation in mL per 20 Minutes")+
+     ylab("Predicted Probability (Citation=1)")+ggtitle("State")+ylim(0,1)+
+     theme(legend.title=element_blank(),legend.position="bottom")+
+     scale_color_brewer(type="qual",labels=labels,palette="Spectral",direction=-1)
+ggsave(paste(root,"/Manuscript/pprcitations.pdf",sep=""),width=7,height=5)
 #==================================================================================================
 # End of File
 #==================================================================================================
