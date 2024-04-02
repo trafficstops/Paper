@@ -1,5 +1,5 @@
 function(input=NULL,dataset,jurisdiction){
-     base      = "citation~nonwhite+night+jcode+ctime+weekday+year"
+     base      = "citation~nonwhite+night+jcode+ctime+weekday+year+dststart"
      if (is.null(input)){
           eq = base 
      } else {

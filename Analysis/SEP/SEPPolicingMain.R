@@ -174,7 +174,7 @@ ggplot(df,aes(x=jurisdiction,color=templabels))+
      geom_errorbar(aes(ymin=conf.low,ymax=conf.high),width=.1,
                    position=position_dodge(width=0.5))+theme_bw()+
      theme(axis.text.x = element_text(angle=90,vjust=0.5,hjust=1))+
-     ylab("Marginal Probability")+
+     ylab("Marginal Probability")+ggtitle("Marginal Probability: Black")+
      theme(legend.position="bottom",axis.title.x=element_blank())+
      labs(color="Temperature Quartile:")
 ggsave(paste(root,"/Manuscript/ALLmeblack.pdf",sep=""),width=11.5,height=7)
